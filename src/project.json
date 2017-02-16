@@ -1,0 +1,28 @@
+{
+  "version": "0.2.1-1",
+  "buildOptions": {
+    "emitEntryPoint": true,
+    "optimize": false,
+    "define": [ "NETCORE" ]
+  },
+
+  "dependencies": {
+    "Microsoft.NETCore.App": {
+      "version": "1.0.1"
+    },
+    "NETStandard.Library": "1.6.0"
+  },
+
+  "frameworks": {
+    "netcoreapp1.6": {
+      "imports": "dnxcore50"
+    }
+  },
+  "runtimes": {
+    "win10-x64": {},
+    "osx.10.11-x64": {}
+  },
+  "description": "Fornt-End Exector",
+  "copyright": "Remilia 2016(C)",
+  "title": "SuperBasic Fornt-End Exector"
+}

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SuperBasicFornt": {
+      "commandName": "Project",
+      "commandLineArgs": "Test.sb"
+    }
+  }
+}
