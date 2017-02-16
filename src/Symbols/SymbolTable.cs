@@ -8,42 +8,6 @@ using System.Threading.Tasks;
 namespace SuperBasic.FrontEnd.Symbols
 {
     /*
-    class Symbol
-    {
-        string identity;
-        Type type;
-        object data;
-
-        public Symbol(string identity, Type type)
-        {
-            this.identity = identity;
-            this.type = type;
-        }
-
-        public Symbol(string id, Type t, object d) : this(id, t)
-        {
-            data = d;
-        }
-
-        public string Identity
-        {
-            get { return identity; }
-        }
-
-        public Type Type
-        {
-            get { return type; }
-        }
-
-        public object Data
-        {
-            get { return data; }
-        }
-    }
-    */
-    //old symbol implement
-
-    /*
      * SymbolTable 符号表
      * 
      * 此符号表维护一个带HashCode的列表，
@@ -56,8 +20,9 @@ namespace SuperBasic.FrontEnd.Symbols
         private Dictionary<string, Id> table;
         private SymbolTable prev;
         private List<SymbolTable> sub;
-        private string name;
+        public Stmt Belong { get; protected set; }
         public int Index { get; protected set; }
+        public string Name { get; protected set; }
 
         /// <summary>
         /// 初始化符号表实例
@@ -65,13 +30,18 @@ namespace SuperBasic.FrontEnd.Symbols
         /// <param name="p">父符号表</param>
         public SymbolTable(SymbolTable p, string name = "")
         {
-            this.name = name;
+            Name = name;
             Index = ++index;
             sub = new List<SymbolTable>();
             table = new Dictionary<string, Id>();
             prev = p;
             prev?.Add(this);
             list.Add(this);
+        }
+
+        public SymbolTable(SymbolTable p, Stmt belong, string name = "") : this(p, name)
+        {
+            Belong = belong;
         }
 
         public void Add(string s, Id sym)
@@ -86,7 +56,7 @@ namespace SuperBasic.FrontEnd.Symbols
 
         public override string ToString()
         {
-            return name.Length == 0 ? "_scope_" + Index : name;
+            return Name.Length == 0 ? "_scope_" + Index : Name;
         }
 
         public IEnumerable<SymbolTable> SubTables
@@ -107,6 +77,11 @@ namespace SuperBasic.FrontEnd.Symbols
         public bool Exist(string s)
         {
             return Table.ContainsKey(s);
+        }
+
+        public IEnumerable<Id> Members
+        {
+            get { return table.Values; }
         }
 
         public Id this[string s]

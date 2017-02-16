@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static SuperBasic.FrontEnd.Inter.IntermediateCode;
 
 namespace SuperBasic.FrontEnd.Parser
 {
@@ -68,10 +69,11 @@ namespace SuperBasic.FrontEnd.Parser
 
         public SymbolTable SymbolScopes { get { return top; } }
 
-        public Parser(LexicalAnalyzer lexical, IntermediateCode inter)
+        public Parser(LexicalAnalyzer lexical)
         {
             lex = lexical;
             reader = new TokenReader(lex.Tokens);
+
         }
         
         private void move()
@@ -148,15 +150,18 @@ namespace SuperBasic.FrontEnd.Parser
         {
             move();
             s = Modules();
-            int begin = s.newlabel(), after = s.newlabel();
-            s.emitLabel(begin);
+            CurrentGenerator.Start(top.SubTables.First());
+            int begin = CurrentGenerator.AllocLabel(), after = CurrentGenerator.AllocLabel();
+            CurrentGenerator.Label(begin);
             s.gen(begin, after);
-            s.emitLabel(after);
+            CurrentGenerator.Label(after);
+            CurrentGenerator.End();
         }
 
         private Stmt Modules()
         {
-            if (Except(Tag.RightBlock)) return Stmt.Null;
+            if (Except(Tag.RightBlock))
+                return new Seq(new EndScope(look.Line, top), Stmt.Null);
             else if (Tag.PROGRAM_END == look.TokenTag) return Stmt.Null;
 
             while(Except(Tag.MODULE))
@@ -219,7 +224,7 @@ namespace SuperBasic.FrontEnd.Parser
                     top = parent;
 
                     Stmt.LastFunction = Stmt.Null;
-                    return func;
+                    return new Seq(func, new EndScope(look.Line, fc));
                 }
                 else
                     isStatic = true;
@@ -291,17 +296,19 @@ namespace SuperBasic.FrontEnd.Parser
         //Block    -> Decls  Stmts
         private Stmt Block(bool newScope = true)
         {
-            SymbolTable saveEnv = top;
-            if(newScope) top = new SymbolTable(top, NextScopeName);
+            SymbolTable saveEnv = top, curEnv = new SymbolTable(top, NextScopeName);
+            if(newScope) top = curEnv;
+            int line = look.Line;
             Stmt s = stmts();
             if(newScope) top = saveEnv;
-            return s;
+            return new Seq(new Scope(line, curEnv), s);
 
         }
 
         private Stmt stmts()
         {
-            if (Except(Tag.RightBlock)) return Stmt.Null;
+            if (Except(Tag.RightBlock))
+                return new Seq(new EndScope(look.Line, top), Stmt.Null);
             else if (Tag.PROGRAM_END == look.TokenTag) return Stmt.Null;
             else if (Test(Tag.STATIC, Tag.FUNCTION, Tag.CLASS))
                 return Stmt.Null;
@@ -402,7 +409,7 @@ namespace SuperBasic.FrontEnd.Parser
             }
             else if(Except(Tag.LeftBlock))
             {
-                return Block(Stmt.Encloseing == Stmt.Null ? false : true);
+                return Block();
             }
             else
             {
@@ -554,6 +561,7 @@ namespace SuperBasic.FrontEnd.Parser
                 string s = (look as Word).lexeme;
                 Id id = top[s];
                 if (id == null) throw new TokenIdentityNotDeclareException(look as Word);
+                if ((!(id is IdFunc)) && (!(id.Type is Symbols.Array)) && id.Offset!=0 && !id.IsInitial) throw new IdentityNotInitialException(look.Line, id);
                 move();
                 if (id.Type.TokenTag == Tag.FUNCTION)
                 {
@@ -592,19 +600,17 @@ namespace SuperBasic.FrontEnd.Parser
 
         private Access Offset(Id a)
         {
-            Expr i, w, t1, t2, loc;
+            Expr i, t1, t2, loc;
             Symbols.Type type = a.Type;
             i = Bool();
             ExceptGrammar(Tag.RightBar);
             type = (type as Symbols.Array).Type;
-            w = new Constant(type.Width);
-            t1 = new Arith(new Token('*', a.lexline, 0), i, w);
+            t1 = new Constant(type.Width);
             loc = t1;
             while(Except(Tag.LeftBra))
             {
                 i = Bool();ExceptGrammar(Tag.RightBar);
-                w = new Constant(type.Width);
-                t1 = new Arith(new Token('*', a.lexline, 0), i, w);
+                t1 = new Constant(type.Width);
                 t2 = new Arith(new Token('+', a.lexline, 0), loc, t1);
             }
             return new Access(a, loc, type);

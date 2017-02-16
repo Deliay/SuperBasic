@@ -112,7 +112,7 @@ namespace SuperBasic.FrontEnd.Symbols
     {
         private Type type;
         private int width = 0;
-        public Array(Type t, int size) : base("[]", Tag.ARRAY, t.Width * size, 0, 0)
+        public Array(Type t, int size) : base("[]", Tag.ARRAY, t.Width, 0, 0)
         {
             type = t;
             width = size;

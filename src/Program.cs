@@ -26,18 +26,18 @@ namespace SuperBasicFornt
 
             Console.WriteLine("Super Basic Front-End Executor");
 
-            if (args.Length != 1)
+            if (args.Length != 3)
             {
-                Console.WriteLine("\n\nNo param passed");
-                Console.WriteLine("Call Param : sbf [file]");
-                Console.ReadLine();
+                Console.WriteLine("\n\nWrong param passed");
+                Console.WriteLine("Param : SuperBasic [file] [gen] [genopt]");
             }
             else
             {
                 string filePath = args[0];
+                string gen = args[1];
+                string genopt = args[2];
                 Stopwatch time = new Stopwatch();
                 LexicalAnalyzer la = new LexicalAnalyzer(baseDirectory);
-                IntermediateCode inter = new IntermediateCode();
 
                 Console.WriteLine("Loading file....");
                 string codeLoaded = File.ReadAllText(filePath);
@@ -54,9 +54,15 @@ namespace SuperBasicFornt
                 time.Stop();
                 Console.WriteLine("Elapsed : " + time.ElapsedMilliseconds + " ms");
                 Console.WriteLine("Readed " + la.Tokens.Count() + " Tokens\n\n");
-
-                Parser p = new Parser(la, inter);
-                Console.WriteLine("Parsering...");
+                Console.WriteLine("Parser to: " + gen);
+                if (gen == "cpp")
+                {
+                    IntermediateCode.SetIO(new CppTextIO());
+                    IntermediateCode.SetGenerator(new CppGenerator(genopt));
+                }
+                Console.WriteLine("Generator Param: " + genopt);
+                Parser p = new Parser(la);
+                Console.WriteLine("\n\nParsering...");
                 //try
                 //{
                     time.Reset(); time.Start();
@@ -70,18 +76,15 @@ namespace SuperBasicFornt
                 //{
                 //    Console.WriteLine("Exception raised while parsering");
                 //    Console.WriteLine(e.Message);
-                //    Console.ReadLine();
                 //    return;
                 //}
 
                 string filename = Path.GetFileNameWithoutExtension(filePath);
-                string output = Path.Combine(baseDirectory, filename + ".tsb");
+                string output = Path.Combine(baseDirectory, filename + "." + IntermediateCode.CurrentIO.FileExt());
 
                 Console.WriteLine("Output to :" + output + "\n\n");
                 File.WriteAllText(output, IntermediateCode.CurrentIO.ToString());
                 Console.WriteLine("Done.");
-                Console.WriteLine("Press enter to exit..");
-                Console.ReadLine();
             }
         }
     }

@@ -73,4 +73,12 @@ namespace SuperBasic.FrontEnd.Errors
         }
     }
 
+    public class IdentityNotInitialException : Exception
+    {
+        public IdentityNotInitialException(int line, Id id) : base("使用了未初始化的变量 " + id.Identity)
+        {
+
+        }
+    }
+
 }

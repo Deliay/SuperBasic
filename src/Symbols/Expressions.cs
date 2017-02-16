@@ -19,30 +19,26 @@ namespace SuperBasic.FrontEnd.Inter
             lexline = line;
         }
 
-        public int newlabel()
-        {
-            return ++labels;
-        }
+        //public int newlabel()
+        //{
+        //    return CurrentGenerator.AllocLabel();
+        //}
 
-        public void emitLabel(int i)
-        {
-            CurrentIO.EmitLabel("L" + i.ToString());
-        }
+        //public void emitLabel(int i)
+        //{
+        //    CurrentGenerator.Label("L" + i.ToString());
+            
+        //}
 
-        public void emitLabel(string i)
-        {
-            CurrentIO.EmitLabel(i);
-        }
+        //public void emit(string s)
+        //{
+        //    CurrentIO.EmitLine(s);
+        //}
 
-        public void emit(string s)
-        {
-            CurrentIO.EmitLine(s);
-        }
-
-        public void emitSrc(string s)
-        {
-            CurrentIO.EmitSource(s);
-        }
+        //public void emitSrc(string s)
+        //{
+        //    CurrentIO.EmitSource(s);
+        //}
 
         public void emitfunSet(Expr exp, Expr toVar)
         {
@@ -55,16 +51,18 @@ namespace SuperBasic.FrontEnd.Inter
                     if (item.Param is FuncCall)
                     {
                         Temp t = new Temp(toVar.Type);
+                        CurrentGenerator.Temp(t);
                         emitfunSet(item.Param, t);
-                        emit("param " + t);
+                        CurrentGenerator.Param(t);
                     }
                     else
                     {
-                        emit("param " + item);
+                        CurrentGenerator.Param(item);
                     }
                 }
             }
-            emit(toVar + " = call " + c.Func);
+            CurrentGenerator.Call(toVar, c.Func);
+            CurrentGenerator.CallEnd();
         }
 
     }
@@ -92,18 +90,18 @@ namespace SuperBasic.FrontEnd.Inter
 
         public virtual void jumping(int t, int f)
         {
-            emitjumps(ToString(), t, f);
+            emitjumps(this, t, f);
         }
 
-        public virtual void emitjumps(string s, int t, int f)
+        public virtual void emitjumps(Expr s, int truejump, int falsejump)
         {
-            if (t != 0 && f != 0)
+            if (truejump != 0 && falsejump != 0)
             {
-                emit("if " + s + " goto L" + t);
-                emit("goto L" + f);
+                CurrentGenerator.If(s, truejump);
+                CurrentGenerator.Goto(falsejump.ToString());
             }
-            else if (t != 0) emit("if " + s + " goto L" + t);
-            else if (f != 0) emit("iffalse " + s + " goto L" + f);
+            else if (truejump != 0) CurrentGenerator.If(s, truejump);
+            else if (falsejump != 0) CurrentGenerator.IfFalse(s, falsejump);
             
         }
 
@@ -122,6 +120,7 @@ namespace SuperBasic.FrontEnd.Inter
             Scope = t;
             IsStatic = s;
             Identity = id;
+            IsInitial = false;
         }
 
         public Id(Param p, SymbolTable t, int b, bool s) : this(p.ParamName, t, p.ParamType, b, s)
@@ -133,9 +132,14 @@ namespace SuperBasic.FrontEnd.Inter
         public SymbolTable Scope { get; protected set; }
         public bool IsStatic { get; protected set; }
         public Word Identity { get; protected set; }
+        public bool IsInitial { get; protected set; }
+        public void setInit()
+        {
+            IsInitial = true;
+        }
         public override string ToString()
         {
-            return Scope + "::" + base.ToString();
+            return base.ToString();
         }
     }
 
@@ -159,7 +163,8 @@ namespace SuperBasic.FrontEnd.Inter
         {
             Expr x = gen();
             Temp t = new Temp(Type);
-            emit(t + " = " + x);
+            CurrentGenerator.Temp(t);
+            CurrentGenerator.Set(t, x);
             return t;
         }
     }
@@ -199,7 +204,7 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override string ToString()
         {
-            return First + " " + ((int)Op.TokenTag < 255 ? (char)Op.TokenTag + "" : Op.TokenTag.ToString()) + " " + Second;
+            return First.reduce() + " " + ((int)Op.TokenTag < 255 ? (char)Op.TokenTag + "" : Op.TokenTag.ToString()) + " " + Second.reduce();
         }
 
     }
@@ -240,8 +245,8 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void jumping(int t, int f)
         {
-            if (this == True && t != 0) emit("goto L" + t);
-            else if (this == False && f != 0) emit("goto L" + f);
+            if (this == True && t != 0) CurrentGenerator.Goto(t);
+            else if (this == False && f != 0) CurrentGenerator.Goto(f);
         }
     }
 
@@ -268,15 +273,16 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override Expr gen()
         {
-            int f = newlabel();
-            int a = newlabel();
+            int f = CurrentGenerator.AllocLabel();
+            int a = CurrentGenerator.AllocLabel();
             Temp t = new Temp(Type);
+            CurrentGenerator.Temp(t);
             jumping(0, f);
-            emit(t + " = true");
-            emit("goto L" + a);
-            emitLabel(f);
-            emit(t + " = false");
-            emitLabel(a);
+            CurrentGenerator.Set(t, Constant.True);
+            CurrentGenerator.Goto(a);
+            CurrentGenerator.Label(f);
+            CurrentGenerator.Set(t, Constant.False);
+            CurrentGenerator.Label(a);
             return t;
         }
 
@@ -295,12 +301,12 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void jumping(int t, int f)
         {
-            int label = t != 0 ? t : newlabel();
+            int label = t != 0 ? t : CurrentGenerator.AllocLabel();
 
             First.jumping(label, 0);
             Second.jumping(t, f);
 
-            if (t == 0) emitLabel(label);
+            if (t == 0) CurrentGenerator.Label(label);
         }
     }
 
@@ -312,10 +318,10 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void jumping(int t, int f)
         {
-            int l = f != 0 ? f : newlabel();
+            int l = f != 0 ? f : CurrentGenerator.AllocLabel();
             First.jumping(0, l);
             Second.jumping(t, f);
-            if (f == 0) emitLabel(l);
+            if (f == 0) CurrentGenerator.Label(l);
         }
     }
 
@@ -346,9 +352,8 @@ namespace SuperBasic.FrontEnd.Inter
         {
             Expr a = First.reduce();
             Expr b = Second.reduce();
-            string test = a + " " + Op + " " + b;
 
-            emitjumps(test, t, f);
+            emitjumps(this, t, f);
         }
 
         public override bool check()
@@ -384,7 +389,7 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void jumping(int t, int f)
         {
-            emitjumps(reduce().ToString(), t, f);
+            emitjumps(reduce(), t, f);
         }
 
         public override string ToString()
@@ -419,6 +424,19 @@ namespace SuperBasic.FrontEnd.Inter
         {
             Func = fun;
             FunParams = param;
+        }
+
+        public override Expr reduce()
+        {
+            foreach (var item in FunParams)
+            {
+                CurrentGenerator.Param(item);
+            }
+            Temp t = new Temp(Func.Params.ReturnType);
+            CurrentGenerator.Temp(t);
+            CurrentGenerator.Call(t, Func);
+            CurrentGenerator.CallEnd();
+            return t;
         }
 
         public override string ToString()

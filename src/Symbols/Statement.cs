@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static SuperBasic.FrontEnd.Inter.IntermediateCode;
 
 namespace SuperBasic.FrontEnd.Inter
 {
@@ -25,11 +26,33 @@ namespace SuperBasic.FrontEnd.Inter
 
         }
 
-        public virtual void genCPP()
+    }
+
+    public class Scope : Stmt
+    {
+        public SymbolTable Symbols { get; protected set; }
+        public Scope(int line, SymbolTable curTable) : base(line)
+        {
+            Symbols = curTable;
+        }
+
+        public override void gen(int begin, int after)
+        {
+            CurrentGenerator.EnterScope(Symbols);
+        }
+    }
+
+    public class EndScope : Scope
+    {
+        public EndScope(int line, SymbolTable curTable) : base(line, curTable)
         {
 
         }
 
+        public override void gen(int begin, int after)
+        {
+            CurrentGenerator.EscapeScope(Symbols);
+        }
     }
 
     public class If : Stmt
@@ -49,9 +72,9 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void gen(int begin, int after)
         {
-            int label = newlabel();
+            int label = CurrentGenerator.AllocLabel();
             Expr.jumping(0, after);
-            emitLabel(label);
+            CurrentGenerator.Label(label);
             Stmt.gen(label, after);
         }
 
@@ -77,13 +100,13 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void gen(int begin, int after)
         {
-            int label1 = newlabel();
-            int label2 = newlabel();
+            int label1 = CurrentGenerator.AllocLabel();
+            int label2 = CurrentGenerator.AllocLabel();
 
             Expr.jumping(0, label2);
 
-            emitLabel(label1); Stmt1.gen(label1, after); emit("goto L" + after);
-            emitLabel(label2); Stmt2.gen(label2, after);
+            CurrentGenerator.Label(label1); Stmt1.gen(label1, after); CurrentGenerator.Goto(after);
+            CurrentGenerator.Label(label2); Stmt2.gen(label2, after);
 
         }
     }
@@ -115,10 +138,10 @@ namespace SuperBasic.FrontEnd.Inter
             this.after = after;
             this.begin = begin;
             Expr.jumping(0, after);
-            int label = newlabel();
+            int label = CurrentGenerator.AllocLabel();
 
-            emitLabel(label); Stmt.gen(label, begin);
-            emit("goto L" + begin);
+            CurrentGenerator.Label(label); Stmt.gen(label, begin);
+            CurrentGenerator.Goto(begin);
         }
 
 
@@ -150,10 +173,10 @@ namespace SuperBasic.FrontEnd.Inter
         {
             this.after = after;
             this.begin = begin;
-            int label = newlabel();
+            int label = CurrentGenerator.AllocLabel();
 
             Stmt.gen(label, begin);
-            emitLabel(label);
+            CurrentGenerator.Label(label);
             Expr.jumping(begin, 0);
         }
     }
@@ -175,17 +198,19 @@ namespace SuperBasic.FrontEnd.Inter
                     if (item.Param is FuncCall)
                     {
                         Temp t = new Temp(Caller.Func.Params.ReturnType);
+                        CurrentGenerator.Temp(t);
                         emitfunSet(item.Param, t);
-                        emit("param " + t);
+                        CurrentGenerator.Param(t);
                     }
                     else
                     {
-                        emit("param " + item);
+                        CurrentGenerator.Param(item);
                     }
                 }
             }
-            emitLabel(newlabel());
-            emit("call " + Caller.Func);
+            CurrentGenerator.Label(CurrentGenerator.AllocLabel());
+            CurrentGenerator.Call(Caller);
+            CurrentGenerator.CallEnd();
         }
     }
 
@@ -200,10 +225,10 @@ namespace SuperBasic.FrontEnd.Inter
         {
             Id = i;
             Expr = x;
-
-            if(!ReserveType.ConvertableT1T2(i.Type, x.Type))
+            Id.setInit();
+            if (!ReserveType.ConvertableT1T2(i.Type, x.Type))
             {
-                throw new TypeCovertException(this.lexline, Id.Type, Expr.Type);
+                throw new TypeCovertException(lexline, Id.Type, Expr.Type);
             }
         }
 
@@ -214,7 +239,7 @@ namespace SuperBasic.FrontEnd.Inter
 
             if (!ReserveType.ConvertableT1T2(i.Type, x.Type))
             {
-                throw new TypeCovertException(this.lexline, Id.Type, Expr.Type);
+                throw new TypeCovertException(lexline, Id.Type, Expr.Type);
             }
         }
 
@@ -227,8 +252,8 @@ namespace SuperBasic.FrontEnd.Inter
             }
             else
             {
-                if (t == null) emit(Id + " = " + Expr.gen());
-                else emit(t + " = " + Expr.gen());
+                if (t == null) CurrentGenerator.Set(Id, Expr.gen());
+                else CurrentGenerator.Set(t, Expr.gen());
             }
         }
     }
@@ -251,10 +276,10 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void gen(int begin, int after)
         {
-            string s1 = Index.reduce().ToString();
-            string s2 = Expr.reduce().ToString();
+            Expr s1 = Index.reduce();
+            Expr s2 = Expr.reduce();
 
-            emit(Array + " [" + s1 + "] = " + s2);
+            CurrentGenerator.SetArr(Array, s1, s2);
         }
 
 
@@ -277,9 +302,9 @@ namespace SuperBasic.FrontEnd.Inter
             else if (Second == Null) First.gen(begin, after);
             else
             {
-                int label = newlabel();
+                int label = CurrentGenerator.AllocLabel();
                 First.gen(begin, label);
-                emitLabel(label);
+                CurrentGenerator.Label(label);
                 Second.gen(label, after);
             }
         }
@@ -301,7 +326,7 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void gen(int begin, int after)
         {
-            emit("goto L" + Stmt.after);
+            CurrentGenerator.Goto(Stmt.after);
         }
     }
 
@@ -321,7 +346,7 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void gen(int begin, int after)
         {
-            emit("goto L" + Stmt.begin);
+            CurrentGenerator.Goto(Stmt.begin);
         }
     }
 
@@ -345,17 +370,18 @@ namespace SuperBasic.FrontEnd.Inter
         public override void gen(int begin, int after)
         {
             
-            if (Parent.Params.ReturnType != null && Parent.Params.ReturnType != ReserveType.Void)
+            if (Parent.Params.ReturnType != ReserveType.Void)
             {
-                if (!ReserveType.ConvertableT1T2(Parent.Params?.ReturnType, ReturnVal.Type)) throw new TypeMisMatchException(this.lexline, ReturnVal.Type, Parent.Params.ReturnType.ToString());
+                if (!ReserveType.ConvertableT1T2(Parent.Params.ReturnType, ReturnVal.Type)) throw new TypeMisMatchException(this.lexline, ReturnVal.Type, Parent.Params.ReturnType.ToString());
                 Temp t = new Temp(Parent.Params.ReturnType);
+                CurrentGenerator.Temp(t);
                 new Set(t, ReturnVal).gen(begin, after);
-                emit("rtn " + t);
+                CurrentGenerator.Return(t);
 
             }
             else
             {
-                emit("rtn");
+                CurrentGenerator.Return(null);
             }
             //emitLabel(Parent.ExitLabel);
 
@@ -382,6 +408,10 @@ namespace SuperBasic.FrontEnd.Inter
             ParamName = name;
             ParamType = type;
         }
+        public override string ToString()
+        {
+            return ParamName.ToString();
+        }
     }
 
     public class Params : Stmt
@@ -392,6 +422,7 @@ namespace SuperBasic.FrontEnd.Inter
         {
             ParamList = args;
             ReturnType = retType;
+            if (ReturnType == null) ReturnType = ReserveType.Void;
         }
 
         public override void gen(int begin, int after)
@@ -409,6 +440,8 @@ namespace SuperBasic.FrontEnd.Inter
         public Stmt Stmt { get; protected set; }
         public Id Id { get; protected set; }
         public int ExitLabel { get; protected set; }
+        public bool ScopeFlag = false;
+
         public Function(int line) : base(line)
         {
 
@@ -423,27 +456,29 @@ namespace SuperBasic.FrontEnd.Inter
 
         public override void gen(int begin, int after)
         {
-            emit("goto L" + after);
-            emitLabel("_func_" + Id.ToString());
+            CurrentGenerator.Goto(after);
             foreach (var item in Params.ParamList)
             {
                 if(item is OptParam)
                 {
-                    emit(item.ParamName + " = " + (item as OptParam).DefaultValue + " optparam " + item.ParamType);
+                    CurrentGenerator.OptParam(item as OptParam, (item as OptParam).DefaultValue, item.ParamType);
                 }
                 else
                 {
-                    emit(item.ParamName + " = param " + item.ParamType);
+                    CurrentGenerator.Param(item, item.ParamType);
                 }
             }
-            int label = newlabel();
-            int label2 = newlabel();
+            
+            int label = CurrentGenerator.AllocLabel();
+            int label2 = CurrentGenerator.AllocLabel();
             ExitLabel = label2;
-            emitLabel(label);
-            Stmt.gen(label, label2);
-            emitLabel(ExitLabel);
-            emit("rtn");
-            emitLabel("_func_end_" + Id.ToString());
+            CurrentGenerator.Label(label);
+            CurrentGenerator.LabelFunc(this);
+            Stmt.gen(begin, after);
+            CurrentGenerator.LabelFuncEnd(this);
+            CurrentGenerator.Label(ExitLabel);
+            //CurrentGenerator.Return(null);
+            
         }
 
         public override string ToString()
