@@ -20,7 +20,7 @@ namespace SuperBasic.FrontEnd.Parser
      * Decls    -> Decl | empty
      * Decl     -> Dim Id As Type, Delegate Id[PARAMS], Dynamic T([PARAMS])
      * Type     -> type[n] | BasicType
-     * Stmts    -> Stmts Stms | empty
+     * Stmts    -> Stmts Stmt | empty
      * 
      * Stmt -> loc = bool
      *      |   If bool Then Stmt
@@ -451,7 +451,7 @@ namespace SuperBasic.FrontEnd.Parser
             Token cur = look;
             if (Except(Tag.OR))
             {
-                return new Or(cur, x, Join());
+                return new Or(cur, x, Bool());
             }
 
             return x;
@@ -463,7 +463,7 @@ namespace SuperBasic.FrontEnd.Parser
             Token cur = look;
             if (Except(Tag.AND))
             {
-                return new And(cur, x, Equality());
+                return new And(cur, x, Join());
             }
 
             return x;
@@ -475,7 +475,7 @@ namespace SuperBasic.FrontEnd.Parser
             Token cur = look;
             if (Except(Tag.EQV, Tag.NEQV))
             {
-                return new Rel(cur, x, Rel());
+                return new Rel(cur, x, Equality());
             }
 
             return x;
@@ -487,7 +487,7 @@ namespace SuperBasic.FrontEnd.Parser
             Token cur = look;
             if (Except(Tag.Less, Tag.LESEQ, Tag.LARGEEQ, Tag.Large)) 
             {
-                return new Rel(cur, x, Expr());
+                return new Rel(cur, x, Rel());
             }
 
             return x;
@@ -499,7 +499,7 @@ namespace SuperBasic.FrontEnd.Parser
             Token cur = look;
             while (Except('+') || Except('-'))
             {
-                x = new Arith(cur, x, Term());
+                x = new Arith(cur, x, Expr());
             }
             return x;
         }
@@ -510,7 +510,7 @@ namespace SuperBasic.FrontEnd.Parser
             Token cur = look;
             while(Except('*') || Except('/') || Except('%'))
             {
-                x = new Arith(cur, x, Unary());
+                x = new Arith(cur, x, Term());
             }
             return x;
         }

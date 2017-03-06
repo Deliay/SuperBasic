@@ -63,21 +63,21 @@ namespace SuperBasicFornt
                 Console.WriteLine("Generator Param: " + genopt);
                 Parser p = new Parser(la);
                 Console.WriteLine("\n\nParsering...");
-                //try
-                //{
+                try
+                {
                     time.Reset(); time.Start();
                     p.Program();
                     time.Stop();
                     Console.WriteLine("Elapsed : " + time.ElapsedMilliseconds + " ms");
                     Console.WriteLine("Intermedia Code Generated : " + IntermediateCode.CurrentIO.ToString().Length + " Bytes\n\n");
 
-                //}
-                //catch (Exception e)
-                //{
-                //    Console.WriteLine("Exception raised while parsering");
-                //    Console.WriteLine(e.Message);
-                //    return;
-                //}
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Exception raised while parsering");
+                    Console.WriteLine(e.Message);
+                    return;
+                }
 
                 string filename = Path.GetFileNameWithoutExtension(filePath);
                 string output = Path.Combine(baseDirectory, filename + "." + IntermediateCode.CurrentIO.FileExt());

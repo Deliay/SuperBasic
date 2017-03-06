@@ -111,7 +111,6 @@ namespace SuperBasic.FrontEnd.Inter
         }
     }
 
-
     public class Id : Expr
     {
         public Id(Word id, SymbolTable t, Symbols.Type p, int b, bool s) : base(id, p)
